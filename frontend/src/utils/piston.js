@@ -1,46 +1,28 @@
-// frontend/src/utils/piston.js
+const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:8000";
 
-const LANGUAGE_VERSIONS = {
-    javascript: "18.15.0",
-    python: "3.10.0",
-    cpp: "10.2.0",
-    java: "15.0.2",
-};
-
-export const executeCode = async (language, sourceCode) => {
-    const version = LANGUAGE_VERSIONS[language] || "*";
-
+export async function executeCode(language, code) {
     try {
-        const response = await fetch("https://emkc.org/api/v2/piston/execute", {
+        const response = await fetch(`${BACKEND_URL}/api/execute`, {
             method: "POST",
             headers: {
                 "Content-Type": "application/json",
             },
-            body: JSON.stringify({
-                language: language === "cpp" ? "cpp" : language,
-                version: version,
-                files: [
-                    {
-                        content: sourceCode,
-                    },
-                ],
-            }),
+            body: JSON.stringify({ language, code }),
         });
 
-        const data = await response.json();
-
-        if (data.run) {
-            // If there's a compilation error or runtime error, return it or standard output
-            if (data.run.stderr) {
-                return data.run.stderr;
-            }
-            return data.run.output;
-        } else if (data.message) {
-            return `Error: ${data.message}`;
+        if (!response.ok) {
+            throw new Error(`Execution failed with status ${response.status}`);
         }
 
-        return "Execution failed: No output returned from server.";
+        const data = await response.json();
+        return data; // Expected format: { run: { output: "...", stdout: "...", stderr: "" } }
     } catch (error) {
-        return `Network or Execution Error: ${error.message}`;
+        console.error("Piston execution error via backend:", error);
+        return {
+            run: {
+                output: "",
+                stderr: `Error connecting to backend execution server: ${error.message}`,
+            },
+        };
     }
-};
+}
